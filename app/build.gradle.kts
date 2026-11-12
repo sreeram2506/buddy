@@ -12,7 +12,7 @@ val localProps = Properties().apply {
 
 android {
     // The file you share, e.g. Buddy-debug.apk instead of app-debug.apk.
-    base.archivesName.set("Buddy")
+    base.archivesName.set("Buddy-1.0.0")
     lint {
         // Permissions are requested up front in MainActivity and re-checked in PhoneActions.telecom(); lint cannot see through those helpers.
         disable += "MissingPermission"
@@ -24,7 +24,7 @@ android {
         minSdk = 31
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1"
+        versionName = "1.0.0"
         ndk { abiFilters += "arm64-v8a" }
         buildConfigField("String", "GROQ_KEY", "\"${localProps.getProperty("GROQ_API_KEY", "")}\"")
         buildConfigField("String", "API_KEY", "\"${localProps.getProperty("GEMINI_API_KEY", "")}\"")
