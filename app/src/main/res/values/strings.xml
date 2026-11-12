@@ -1,0 +1,4 @@
+<resources>
+    <string name="a11y_description">Lets Buddy read the screen and tap, type and scroll when you ask it to control your phone.</string>
+    <string name="widget_description">Tap to talk to Buddy.</string>
+</resources>

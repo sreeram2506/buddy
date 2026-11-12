@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:keepScreenOn="true"
+    android:background="@color/bg"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Buddy" android:textSize="24sp" android:textStyle="bold" android:letterSpacing="0.04" android:textColor="#EAF1F7" />
+            <TextView android:id="@+id/status" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:textSize="12sp" android:textColor="#7F8C9A" />
+        </LinearLayout>
+        <Spinner android:id="@+id/lang" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+        <TextView android:id="@+id/clear" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Clear" android:textSize="14sp" android:padding="10dp" android:textColor="#7F8C9A" android:clickable="true" android:focusable="true" />
+        <TextView android:id="@+id/settings" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="⚙" android:textSize="22sp" android:padding="10dp" android:textColor="#C5D0DB" android:clickable="true" android:focusable="true"
+            android:contentDescription="Settings" />
+    </LinearLayout>
+
+    <com.sreeram.jarvis.OrbView android:id="@+id/orb" android:layout_width="match_parent" android:layout_height="210dp"
+        android:contentDescription="Tap to talk to Buddy" />
+    <TextView android:id="@+id/talk" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:gravity="center" android:padding="6dp" android:text="Talk to Buddy" android:textSize="15sp"
+        android:textColor="#9AA8B6" android:clickable="true" android:focusable="true" />
+
+    <ScrollView android:id="@+id/scroll" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+        android:fadingEdge="vertical" android:requiresFadingEdge="vertical" android:fadingEdgeLength="24dp">
+        <LinearLayout android:id="@+id/chat" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <HorizontalScrollView android:id="@+id/chips_scroll" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:scrollbars="none" android:layout_marginTop="6dp">
+        <LinearLayout android:id="@+id/chips" android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" />
+    </HorizontalScrollView>
+
+    <LinearLayout android:layout_width="0dp" android:layout_height="0dp" android:orientation="vertical" android:visibility="gone">
+        <Switch android:id="@+id/live" android:saveEnabled="false" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <Switch android:id="@+id/wake" android:saveEnabled="false" android:layout_width="match_parent" android:layout_height="wrap_content" />
+        <Button android:id="@+id/train" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginTop="10dp">
+        <EditText android:id="@+id/input" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:background="@drawable/bg_input" android:paddingStart="20dp" android:paddingEnd="20dp" android:paddingTop="13dp" android:paddingBottom="13dp"
+            android:hint="Ask Buddy anything" android:textColorHint="#6B7785" android:textColor="#EAF1F7" android:textSize="16sp"
+            android:imeOptions="actionSend" android:inputType="textCapSentences|textMultiLine" android:maxLines="3" />
+        <Button android:id="@+id/send" android:layout_width="48dp" android:layout_height="48dp" android:layout_marginStart="10dp"
+            android:background="@drawable/bg_send" android:text="↑" android:textSize="22sp" android:textColor="#06231E" android:textStyle="bold"
+            android:minWidth="0dp" android:minHeight="0dp" android:padding="0dp" android:contentDescription="Send" />
+    </LinearLayout>
+</LinearLayout>

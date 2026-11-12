@@ -1,0 +1,9 @@
+<resources>
+    <color name="ic_launcher_background">#1A1A1A</color>
+    <color name="bg">#0B0F14</color>
+    <color name="surface">#151B23</color>
+    <color name="accent">#2EE6C5</color>
+    <color name="bubble_user">#1F6F63</color>
+    <color name="bubble_buddy">#1A222C</color>
+    <color name="bubble_text">#EAF1F7</color>
+</resources>
