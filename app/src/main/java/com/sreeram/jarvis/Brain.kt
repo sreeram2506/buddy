@@ -16,6 +16,7 @@ object Session {
     @Volatile var startInterpreter: ((String, String) -> Unit)? = null
     @Volatile var stopInterpreter: (() -> Unit)? = null
     @Volatile var moveToBack: (() -> Unit)? = null // set by the main screen so tools can step Buddy aside
+    @Volatile var endLive: (() -> Unit)? = null // closes an open live conversation, so turning Buddy off also closes the mic it holds
 }
 
 object Turns {

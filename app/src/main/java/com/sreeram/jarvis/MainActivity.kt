@@ -97,6 +97,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginEnd = dp(8) })
         }
         Session.moveToBack = { runOnUiThread { moveTaskToBack(true) } }
+        Session.endLive = { runOnUiThread { endLive() } }
         Session.startInterpreter = { a, b -> restartLive(brain.interpreterPrompt(a, b), declsFor(setOf("stop_interpreter"))) }
         Session.stopInterpreter = { restartLive(null, null) }
         WakeWordService.onStop = {
@@ -125,7 +126,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         wake.setOnClickListener {
             val on = wake.isChecked
             prefs.edit().putBoolean("wake", on).apply()
-            if (on) enableWake() else WakeWordService.stop(this)
+            if (on) enableWake() else { WakeWordService.stop(this); endLive() }
         }
         if (wake.isChecked) enableWake()
 
@@ -448,6 +449,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     override fun onDestroy() {
         live?.stop()
         Session.moveToBack = null
+        Session.endLive = null
         Session.startInterpreter = null
         Session.stopInterpreter = null
         WakeWordService.onStop = null; WakeWordService.activitySpeaking = false

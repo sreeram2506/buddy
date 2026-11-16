@@ -73,7 +73,7 @@ class BuddySettingsActivity : AppCompatActivity() {
         }
         section("Listening") {
             toggle("Say \"Hey Buddy\" to wake", "wake", false, "Listens only while the phone is unlocked. Audio is checked on the phone and never saved.") { on ->
-                if (on) WakeWordService.start(this) else WakeWordService.stop(this)
+                if (on) WakeWordService.start(this) else { WakeWordService.stop(this); Session.endLive?.invoke() }
             }
             button("Train my voice (Hey Buddy)", "primary") { startActivity(Intent(this, MainActivity::class.java).putExtra("train", true).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)) }
             button("Voice check (read 10 sentences)") {
@@ -138,7 +138,7 @@ class BuddySettingsActivity : AppCompatActivity() {
             button("Clear chat history") { ChatStore(this).clear(); toast("Chat cleared") }
             button("Shut down Buddy (mic off, Away and Driving off)", "danger") {
                 prefs.edit().putBoolean("wake", false).apply()
-                WakeWordService.stop(this); if (Away.active(this)) Away.end(this); Driving.stop(this)
+                WakeWordService.stop(this); Session.endLive?.invoke(); if (Away.active(this)) Away.end(this); Driving.stop(this)
                 toast("Buddy is off. Open Settings to turn things back on."); build()
             }
         }
