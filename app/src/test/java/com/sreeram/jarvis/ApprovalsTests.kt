@@ -81,6 +81,17 @@ class ApprovalsTests {
         assertNull(Approvals.tappedResult())
     }
 
+    @Test fun theNotificationIsRemovedWheneverAnOfferIsSettled() {
+        var removed = 0
+        Approvals.onSettled = { removed++ }
+        val a = Approvals.offer("a", { "ok" }, {}); Approvals.approve(a.id)
+        val b = Approvals.offer("b", { "ok" }, {}); Approvals.cancel(b.id)
+        Approvals.offer("c", { "ok" }, {}); Approvals.clear()
+        Approvals.clear() // nothing waiting: nothing to remove
+        assertEquals(3, removed)
+        Approvals.onSettled = {}
+    }
+
     @Test fun clearingAfterAVoiceApprovalRemovesTheOffer() {
         val o = Approvals.offer("Send", { "x" }, {})
         Approvals.clear()

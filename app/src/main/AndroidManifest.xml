@@ -48,6 +48,7 @@
         </activity>
         <activity android:name=".AssistantSettingsActivity" android:exported="true" />
         <activity android:name=".BuddySettingsActivity" android:exported="false" android:label="Buddy settings" />
+        <activity android:name=".SimpleModeActivity" android:exported="false" android:label="Buddy simple mode" />
         <service android:name=".JarvisInteractionService"
             android:permission="android.permission.BIND_VOICE_INTERACTION"
             android:exported="true">

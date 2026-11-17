@@ -21,6 +21,9 @@ object Approvals {
     const val NOT_WAITING = "That request is no longer waiting."
     @Volatile var clock: () -> Long = { System.currentTimeMillis() }
 
+    // Called whenever the current offer is settled (approved, cancelled or cleared), so a shown notification can be removed.
+    @Volatile var onSettled: () -> Unit = {}
+
     private var current: Offer? = null
     private var nextId = 1L
     private var tapped: Pair<String, Long>? = null
@@ -40,9 +43,10 @@ object Approvals {
             val c = current
             if (c == null || c.id != id) return NOT_WAITING
             current = null
-            if (clock() - c.time > TTL_MS) return "That request expired. Ask Buddy again."
+            if (clock() - c.time > TTL_MS) { onSettled(); return "That request expired. Ask Buddy again." }
             c
         }
+        onSettled()
         val result = o.approve()
         synchronized(this) { tapped = result to clock() }
         return result
@@ -55,12 +59,13 @@ object Approvals {
             current = null
             c
         }
+        onSettled()
         o.cancel()
         return true
     }
 
     // Called when the action was settled some other way (the user said yes out loud), so the notification does not linger.
-    @Synchronized fun clear() { current = null }
+    @Synchronized fun clear() { if (current != null) { current = null; onSettled() } }
 
     // If the user already approved by tapping, a later spoken "yes" must say so instead of reporting that nothing is waiting.
     @Synchronized fun tappedResult(): String? = tapped?.takeIf { clock() - it.second <= TTL_MS }?.first?.let { "The user already approved this by tapping the notification. Result: $it" }
@@ -79,6 +84,7 @@ object ApprovalUi {
     fun offer(title: String, approve: () -> String, cancel: () -> Unit) {
         val o = Approvals.offer(title, approve, cancel)
         val c = appContext ?: return
+        Approvals.onSettled = { try { dismiss(c) } catch (e: Exception) { } }
         try { show(c, o) } catch (e: Exception) { ActivityLog.add(c, "Could not show the approval notification: ${e.message}", failed = true) }
     }
 

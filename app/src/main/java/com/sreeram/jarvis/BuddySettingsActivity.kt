@@ -76,6 +76,11 @@ class BuddySettingsActivity : AppCompatActivity() {
         val head = TextView(this).apply { text = "Settings"; textSize = 26f; setTextColor(Color.parseColor("#EAF1F7")); setTypeface(typeface, android.graphics.Typeface.BOLD); setPadding(0, dp(4), 0, dp(8)) }
         page.addView(head)
 
+        section("Simple mode") {
+            note("One big screen with large buttons: read my messages, call or text a person, and a huge Yes / No for anything Buddy wants to do.")
+            text("People on the big screen (comma separated contact names)", SimpleMode.CONTACTS_KEY, SimpleMode.DEFAULT_CONTACTS)
+            button("Open simple mode", "primary") { startActivity(Intent(this, SimpleModeActivity::class.java)) }
+        }
         section("Health") {
             val checks = Health.checks(this)
             val bad = checks.count { !it.ok }
