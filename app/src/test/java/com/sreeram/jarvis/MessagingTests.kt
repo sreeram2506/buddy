@@ -121,3 +121,17 @@ class MessagingTests {
         assertFalse(PhoneNumbers.sameNumber("98765 43210", "98765 43211"))
     }
 }
+
+class RegionTests {
+    @org.junit.Test fun simCountryBeatsThePhoneLanguage() {
+        // en-GB phone, Indian SIM: a bare 10-digit number is Indian.
+        val region = com.sreeram.jarvis.msg.PhoneNumbers.pickRegion("in", "in", "GB")
+        org.junit.Assert.assertEquals("IN", region)
+        org.junit.Assert.assertEquals("918309078104", com.sreeram.jarvis.msg.PhoneNumbers.digitsWithCountryCode("8309078104", region))
+    }
+    @org.junit.Test fun fallsBackThroughNetworkThenLanguageThenIndia() {
+        org.junit.Assert.assertEquals("IN", com.sreeram.jarvis.msg.PhoneNumbers.pickRegion("", "in", "GB"))
+        org.junit.Assert.assertEquals("GB", com.sreeram.jarvis.msg.PhoneNumbers.pickRegion(null, "", "GB"))
+        org.junit.Assert.assertEquals("IN", com.sreeram.jarvis.msg.PhoneNumbers.pickRegion(null, null, ""))
+    }
+}

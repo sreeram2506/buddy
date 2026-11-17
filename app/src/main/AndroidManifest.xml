@@ -96,6 +96,7 @@
         </service>
         <receiver android:name=".BriefingReceiver" android:exported="false" />
         <receiver android:name=".RecorderStopReceiver" android:exported="false" />
+        <receiver android:name=".ApprovalReceiver" android:exported="false" />
         <receiver android:name=".SmsReceiver" android:exported="true" android:permission="android.permission.BROADCAST_SMS">
             <intent-filter><action android:name="android.provider.Telephony.SMS_RECEIVED" /></intent-filter>
         </receiver>

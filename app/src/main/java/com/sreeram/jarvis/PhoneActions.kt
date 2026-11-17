@@ -56,6 +56,7 @@ class PhoneActions(private val context: Context) {
     private var draft: Draft? = null
     private class PendingAction(val kind: String, val target: String, val message: String, val turn: Int, val time: Long)
     private var pending: PendingAction? = null
+    init { ApprovalUi.appContext = context.applicationContext }
 
     fun facts(): List<String> = store.facts()
 
@@ -368,17 +369,19 @@ class PhoneActions(private val context: Context) {
     private fun prepareCall(number: String, name: String): String {
         val display = name.ifBlank { contactName(number) ?: number }
         pending = PendingAction("call", number, display, Turns.count, System.currentTimeMillis())
+        ApprovalUi.offer("Call $display on $number", { confirmCall(viaTap = true) }, { pending = null })
         return "Ready to call $display on $number. Nothing has been dialled. Ask the user to confirm."
     }
 
     @Volatile private var speakerNext = false
 
-    private fun confirmCall(): String {
-        val p = takePending("call") ?: return "There is no call prepared."
-        if (Turns.count <= p.turn) return "The user has not confirmed yet. Ask them first and wait for their answer."
-        if (!Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
+    private fun confirmCall(viaTap: Boolean = false): String {
+        val p = takePending("call") ?: return Approvals.tappedResult() ?: "There is no call prepared."
+        if (!viaTap && Turns.count <= p.turn) return "The user has not confirmed yet. Ask them first and wait for their answer."
+        if (!viaTap && !Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
         if (System.currentTimeMillis() - p.time > 180000) { pending = null; return "That call expired. Prepare it again." }
         pending = null
+        Approvals.clear()
         return call(p.target, speakerNext)
     }
 
@@ -615,7 +618,10 @@ class PhoneActions(private val context: Context) {
         return "I opened $key and tapped ${tapped.take(60)}, but I can't confirm it started playing. It may need a tap on play."
     }
 
-    private fun normalizeNumber(raw: String): String = PhoneNumbers.digitsWithCountryCode(raw, Locale.getDefault().country.ifBlank { "IN" })
+    private fun normalizeNumber(raw: String): String {
+        val tm = context.getSystemService(android.telephony.TelephonyManager::class.java)
+        return PhoneNumbers.digitsWithCountryCode(raw, PhoneNumbers.pickRegion(tm?.simCountryIso, tm?.networkCountryIso, Locale.getDefault().country))
+    }
 
     private fun draftWhatsapp(name: String, message: String): String {
         if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED)
@@ -625,15 +631,17 @@ class PhoneActions(private val context: Context) {
         if (found.values.distinct().size > 1) return "Several contacts match: " + found.values.distinct().joinToString(", ") + ". Ask which one."
         val (number, display) = found.entries.first()
         draft = Draft(number, display, message, Turns.count, System.currentTimeMillis())
+        ApprovalUi.offer("Send WhatsApp to $display: \"${message.take(150)}\"", { confirmWhatsapp(viaTap = true) }, { draft = null })
         return "Draft to $display on WhatsApp: \"$message\". Nothing has been sent. Read it back and ask the user to confirm."
     }
 
-    private fun confirmWhatsapp(): String {
-        val d = draft ?: return "There is no draft to send."
-        if (Turns.count <= d.turn) return "The user has not confirmed yet. Ask them first and wait for their answer."
-        if (!Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
+    private fun confirmWhatsapp(viaTap: Boolean = false): String {
+        val d = draft ?: return Approvals.tappedResult() ?: "There is no draft to send."
+        if (!viaTap && Turns.count <= d.turn) return "The user has not confirmed yet. Ask them first and wait for their answer."
+        if (!viaTap && !Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
         if (System.currentTimeMillis() - d.time > 180000) { draft = null; return "That draft expired. Prepare it again." }
         draft = null
+        Approvals.clear()
         start(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${d.number}?text=" + Uri.encode(d.message))).setPackage("com.whatsapp"), "")
         val svc = JarvisAccessibilityService.instance ?: return "Opened the chat with your message typed in. Accessibility is off, so tap Send yourself."
         return sendWhatsAppAndVerify(svc, d.name, d.message).forModel(d.name, "WhatsApp")
@@ -701,6 +709,7 @@ class PhoneActions(private val context: Context) {
     private fun draftReply(sender: String, message: String): String {
         val target = NotificationStore.replyFor(sender) ?: return "I can't reply to $sender, there is no recent message notification from them that allows replies."
         pending = PendingAction("reply", target.sender, message, Turns.count, System.currentTimeMillis())
+        ApprovalUi.offer("Reply to ${target.sender}: \"${message.take(150)}\"", { confirmReply(viaTap = true) }, { pending = null })
         return "Draft reply to ${target.sender}: \"$message\". Nothing has been sent. Read it back and ask the user to confirm."
     }
 
@@ -709,11 +718,12 @@ class PhoneActions(private val context: Context) {
         return if (p.kind == kind) p else null
     }
 
-    private fun confirmReply(): String {
-        val p = takePending("reply") ?: return "There is no reply to send."
-        if (Turns.count <= p.turn) return "The user has not confirmed yet. Ask them first and wait for their answer."
-        if (!Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
+    private fun confirmReply(viaTap: Boolean = false): String {
+        val p = takePending("reply") ?: return Approvals.tappedResult() ?: "There is no reply to send."
+        if (!viaTap && Turns.count <= p.turn) return "The user has not confirmed yet. Ask them first and wait for their answer."
+        if (!viaTap && !Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
         if (System.currentTimeMillis() - p.time > 180000) { pending = null; return "That draft expired. Prepare it again." }
+        Approvals.clear()
         val target = NotificationStore.replyFor(p.target) ?: run { pending = null; return "That notification is gone, so I can't reply." }
         pending = null
         val intent = Intent()
@@ -782,15 +792,17 @@ class PhoneActions(private val context: Context) {
         val list = emergencyContacts()
         if (list.isEmpty()) return "No emergency contacts are set. Ask the user who to add."
         pending = PendingAction("sos", "", "", Turns.count, System.currentTimeMillis())
+        ApprovalUi.offer("Text an SOS with your location to ${list.joinToString(", ") { it.substringBefore('|') }}", { confirmSos(viaTap = true) }, { pending = null })
         return "Ready to text SOS with your location to ${list.joinToString(", ") { it.substringBefore('|') }}. Nothing has been sent. Ask the user to confirm."
     }
 
-    private fun confirmSos(): String {
-        val p = takePending("sos") ?: return "There is no SOS prepared."
-        if (Turns.count <= p.turn) return "The user has not confirmed yet. Ask them first and wait for their answer."
-        if (!Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
+    private fun confirmSos(viaTap: Boolean = false): String {
+        val p = takePending("sos") ?: return Approvals.tappedResult() ?: "There is no SOS prepared."
+        if (!viaTap && Turns.count <= p.turn) return "The user has not confirmed yet. Ask them first and wait for their answer."
+        if (!viaTap && !Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
         if (context.checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) return "SMS permission is not granted."
         pending = null
+        Approvals.clear()
         val body = "SOS! I need help. " + (locationText()?.let { "My location: $it" } ?: "I couldn't get my location.")
         val sms = context.getSystemService(Sms::class.java)
         val sent = emergencyContacts().map { it.substringBefore('|') to it.substringAfter('|') }

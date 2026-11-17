@@ -17,16 +17,21 @@ object SendGuard {
 
     fun request(what: String, run: () -> String): String {
         pending = Pending(what, Turns.count, System.currentTimeMillis(), run)
+        ApprovalUi.offer("Buddy wants to: $what", { approve(viaTap = true) }, { pending = null })
         return "NEEDS APPROVAL: $what. Nothing has been done. Tell the user exactly what will happen and ask them to confirm. " +
-            "Only after they say yes in a new message, call approve_action."
+            "Only after they say yes in a new message, call approve_action. A tap-to-approve notification is also showing; if they tap it, approve_action will report that."
     }
 
-    fun approve(): String {
-        val p = pending ?: return "There is nothing waiting for approval."
-        if (Turns.count <= p.turn) return "The user has not answered yet. Ask them first and wait for their answer."
-        if (!Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
+    // A tap on the notification is the approval, so the "new turn" and "yes in the transcript" checks (which only exist because speech is unreliable) are skipped.
+    fun approve(viaTap: Boolean = false): String {
+        val p = pending ?: return Approvals.tappedResult() ?: "There is nothing waiting for approval."
+        if (!viaTap) {
+            if (Turns.count <= p.turn) return "The user has not answered yet. Ask them first and wait for their answer."
+            if (!Turns.affirmative()) return "The user's last message was not a clear yes. Ask again."
+        }
         if (System.currentTimeMillis() - p.time > 180_000) { pending = null; return "That request expired. Start it again." }
         pending = null
+        Approvals.clear()
         val r = p.run()
         return r + afterSend()
     }

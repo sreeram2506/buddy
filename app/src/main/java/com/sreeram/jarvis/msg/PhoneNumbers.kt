@@ -16,5 +16,10 @@ object PhoneNumbers {
         } catch (e: Exception) { digits }
     }
 
+    // The country a bare number belongs to: where the SIM is, then the network, and only then the phone's language, which says nothing about
+    // where the number is from (an English (UK) phone with an Indian SIM must read 8309078104 as +91, not +44).
+    fun pickRegion(sim: String?, network: String?, locale: String?): String =
+        listOf(sim, network, locale).firstOrNull { !it.isNullOrBlank() }?.uppercase() ?: "IN"
+
     fun sameNumber(a: String, b: String, region: String = "IN") = digitsWithCountryCode(a, region) == digitsWithCountryCode(b, region)
 }
