@@ -23,7 +23,10 @@ object Lang {
     // the user only ever speaks English, Hindi or Telugu, so Buddy must only ever answer in those.
     fun promptRule(code: String): String = "The user only ever speaks English, Hindi or Telugu. If a word or sentence sounds like any other language, " +
         "assume it was misheard and answer in English, Hindi or Telugu only, never in French, Spanish, Turkish, Italian or any other language. " +
-        "Keep tool arguments such as contact names, app names and search queries in English letters. " + when (code) {
+        "Keep tool arguments such as contact names, app names and search queries in English letters. " +
+        "Speak the way a friend does, in short, simple everyday words, not formal or bookish ones (spoken Telugu, not literary Telugu; everyday Hindi, not Sanskritised Hindi). " +
+        "Keep common English words people really use, such as phone, WhatsApp, battery, message and call, as they are. If the user writes Hindi or Telugu in English letters, understand it fully, and still reply in the proper script. " +
+        "If you are unsure what they meant, ask one short question instead of guessing. " + when (code) {
         "hi" -> "Always reply in Hindi, written in Devanagari script, whatever language the user speaks."
         "te" -> "Always reply in Telugu, written in Telugu script, whatever language the user speaks."
         "en" -> "Always reply in English."

@@ -25,6 +25,17 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
+// Pure helpers for session resumption, kept out of the socket code so they can be tested.
+object LiveResume {
+    const val MAX_RESUMES = 6
+
+    // The server sends a fresh handle now and then; only a resumable one with a value is worth keeping.
+    fun handleFrom(m: org.json.JSONObject): String? =
+        m.optJSONObject("sessionResumptionUpdate")?.takeIf { it.optBoolean("resumable", false) }?.optString("newHandle")?.takeIf { it.isNotEmpty() }
+
+    fun canResume(handle: String?, resumesSoFar: Int) = !handle.isNullOrEmpty() && resumesSoFar < MAX_RESUMES
+}
+
 // A real-time voice conversation with Gemini Live: your microphone streams up, the model's voice streams back,
 // you can interrupt it by speaking, and it can use Buddy's phone tools mid-conversation.
 class LiveSession(
@@ -48,6 +59,12 @@ class LiveSession(
     private var startedAt = 0L
     private var firstAudioLogged = false
     private var socket: WebSocket? = null
+    // The server asks us to reconnect before its time limit (goAway). With a resumption handle the new connection continues the same conversation,
+    // so the user hears no break; the microphone and speaker keep running and only the socket is swapped.
+    @Volatile private var resumeHandle: String? = null
+    @Volatile private var resuming = false
+    @Volatile private var generation = 0
+    private var resumes = 0
     @Volatile private var running = false
     @Volatile private var ready = false
     @Volatile private var modelSpeaking = false
@@ -91,16 +108,23 @@ class LiveSession(
         Session.liveRunning = true
         Session.frameSink = { sendFrame(it) }
         Session.endRequested = false
+        connect()
+    }
+
+    private fun connect() {
+        val gen = ++generation
         val url = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${BuildConfig.API_KEY}"
         socket = client.newWebSocket(Request.Builder().url(url).build(), object : WebSocketListener() {
-            override fun onOpen(webSocket: WebSocket, response: Response) { webSocket.send(setupJson()) }
-            override fun onMessage(webSocket: WebSocket, text: String) = handle(text)
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) = handle(bytes.utf8())
+            override fun onOpen(webSocket: WebSocket, response: Response) { if (gen == generation) webSocket.send(setupJson()) }
+            override fun onMessage(webSocket: WebSocket, text: String) { if (gen == generation) handle(text) }
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) { if (gen == generation) handle(bytes.utf8()) }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                if (gen != generation) return // the connection we already replaced
                 Log.e("Jarvis", "live failure ${response?.code}: ${t.message}")
                 end("connection failed", failed = true)
             }
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                if (gen != generation) return
                 Log.d("Jarvis", "live closed $code $reason")
                 end(reason.ifBlank { "closed" }, failed = code != 1000)
             }
@@ -123,9 +147,18 @@ class LiveSession(
             .put("prefixPaddingMs", 300).put("silenceDurationMs", 1200)))
         .put("inputAudioTranscription", JSONObject())
         .put("outputAudioTranscription", JSONObject())
-        .put("contextWindowCompression", JSONObject().put("slidingWindow", JSONObject()))).toString()
+        .put("contextWindowCompression", JSONObject().put("slidingWindow", JSONObject()))
+        .put("sessionResumption", JSONObject().also { r -> resumeHandle?.let { r.put("handle", it) } })).toString()
 
-    private fun send(json: JSONObject) { socket?.send(json.toString()) }
+    private fun resume() {
+        Log.d("Jarvis", "live resuming (#$resumes)")
+        resuming = true
+        val old = socket
+        connect()
+        try { old?.close(1000, "resume") } catch (e: Exception) { }
+    }
+
+    private fun send(json: JSONObject) { if (!resuming) socket?.send(json.toString()) }
 
     private fun sendFrame(jpeg: ByteArray) {
         if (!running || !ready) return
@@ -136,6 +169,7 @@ class LiveSession(
     private fun handle(raw: String) {
         if (!running) return
         val m = try { JSONObject(raw) } catch (e: Exception) { return }
+        if (m.has("setupComplete") && resuming) { resuming = false; Log.d("Jarvis", "live resumed"); return }
         if (m.has("setupComplete")) {
             startAudio(); ready = true; listener.onReady()
             Log.d("Jarvis", "live ready in ${System.currentTimeMillis() - startedAt} ms")
@@ -144,7 +178,11 @@ class LiveSession(
                 .put("parts", JSONArray().put(JSONObject().put("text", it))))).put("turnComplete", true))) }
             return
         }
-        if (m.has("goAway")) { end("session time limit", failed = false); return }
+        LiveResume.handleFrom(m)?.let { resumeHandle = it }
+        if (m.has("goAway")) {
+            if (LiveResume.canResume(resumeHandle, resumes)) { resumes++; resume() } else end("session time limit", failed = false)
+            return
+        }
         m.optJSONObject("toolCall")?.let { runTools(it); return }
         val sc = m.optJSONObject("serverContent") ?: return
         sc.optJSONObject("inputTranscription")?.optString("text")?.takeIf { it.isNotEmpty() }?.let {
