@@ -36,10 +36,12 @@ object Turns {
     }
 }
 
+private const val MAX_HISTORY = 40
+
 private const val CHAT_RULES = "In chat screens, a line marked [YOU SENT THIS] is something the user wrote; [THEY SENT THIS] is something the other person wrote. Never mix them up when reading or summarising a conversation, and say who said what. " +
     "Only tell the user a message was sent if the tool result confirms it (a delivery status or the message visible in the chat); if the result says pending, not visible or unconfirmed, say exactly that."
 
-class Brain(private val apiKey: String, private val groqKey: String, private val actions: PhoneActions) {
+class Brain(private val apiKey: String, private val groqKey: String, private val actions: PhoneActions, private val recent: () -> String = { "" }) {
     private class Unavailable(message: String) : Exception(message)
     private var screenMode = false
     private val failed = mutableSetOf<String>()
@@ -81,7 +83,7 @@ class Brain(private val apiKey: String, private val groqKey: String, private val
         "Translate faithfully and completely in the first person, as if you were the speaker. Add no comments, greetings, explanations or answers of your own, " +
         "and never refuse to translate ordinary speech. Speak at a natural pace. Only if someone says 'stop interpreting' or 'exit interpreter mode', call stop_interpreter."
 
-    fun liveSystemPrompt(): String = systemPrompt() + " " + actions.speechHints() + " You are in a live voice conversation. Talk naturally and warmly, like a helpful friend: " +
+    fun liveSystemPrompt(): String = systemPrompt(withRecent = true) + " " + actions.speechHints() + " You are in a live voice conversation. Talk naturally and warmly, like a helpful friend: " +
         "short sentences, no lists, no markdown, no reading out symbols or URLs. If the user interrupts, stop and listen. " +
         "To see what the user is pointing the camera at, use start_camera_view; to see their screen, use start_screen_share. Then answer from what you see, and call stop_sharing when you are done. " +
         "Do not narrate your tool use; just do it and give a brief natural confirmation. " +
@@ -92,10 +94,13 @@ class Brain(private val apiKey: String, private val groqKey: String, private val
         (if (actions.drivingOn()) "Driving mode is ON: the user's hands are busy. Keep every answer to one short sentence, read messages aloud, offer to reply by voice, and still ask them to confirm before anything is sent. " else "") +
         "When the user says goodbye, bye, see you, that's all, or asks you to close or quit, say a short farewell and call end_conversation."
 
-    private fun systemPrompt(): String {
+    // The text conversation already carries its own history; a fresh one (or a live voice session) gets the recent chat as a reference note.
+    private fun systemPrompt(withRecent: Boolean = history.length() == 0): String {
         val facts = actions.facts()
         val base = system + " " + actions.languageRule() + " " + CHAT_RULES
-        return if (facts.isEmpty()) base else base + " Known facts about the user: " + facts.joinToString("; ") + "."
+        val withFacts = if (facts.isEmpty()) base else base + " Known facts about the user: " + facts.joinToString("; ") + "."
+        val note = if (withRecent) try { recent() } catch (e: Exception) { "" } else ""
+        return if (note.isEmpty()) withFacts else withFacts + "\n\n" + note
     }
 
     // Sending every tool on every request wastes tokens and trips rate limits, so each request gets only the
@@ -244,6 +249,8 @@ class Brain(private val apiKey: String, private val groqKey: String, private val
         while (history.length() > start) history.remove(history.length() - 1)
         history.put(userTurn(userText))
         history.put(JSONObject().put("role", "model").put("parts", JSONArray().put(JSONObject().put("text", reply))))
+        // Whole turns only (a user entry and its reply), so the history never starts with an orphaned reply. A long day would otherwise grow without limit.
+        while (history.length() > MAX_HISTORY) { history.remove(0); history.remove(0) }
         return reply
     }
 

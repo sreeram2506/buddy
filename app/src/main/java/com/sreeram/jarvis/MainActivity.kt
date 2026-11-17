@@ -56,7 +56,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         getSystemService(PowerManager::class.java).newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "buddy:task")
     }
     private val actions by lazy { PhoneActions(this) }
-    private val brain by lazy { Brain(BuildConfig.API_KEY, BuildConfig.GROQ_KEY, actions) }
+    private val brain by lazy { Brain(BuildConfig.API_KEY, BuildConfig.GROQ_KEY, actions) { RecentContext.block(store.all(), System.currentTimeMillis()) } }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
