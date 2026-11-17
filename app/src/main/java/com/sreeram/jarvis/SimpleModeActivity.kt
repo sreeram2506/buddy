@@ -39,6 +39,9 @@ object SimpleMode {
             r.startsWith("No contact matching", true) -> "I could not find that person in your contacts."
             r.contains("permission", true) && r.contains("contacts", true) -> "Buddy needs permission to see your contacts. Please ask someone to allow it in Settings."
             r.contains("no longer waiting", true) -> "That was already answered."
+            r.startsWith("No emergency contacts are set", true) -> "No helper has been chosen yet. Please ask someone to add one in Buddy settings."
+            r.contains("SMS permission is not granted", true) -> "Buddy is not allowed to send texts. Please ask someone to allow it in Settings."
+            r.startsWith("I can't get your location", true) -> "I cannot find where you are. Please check that location is turned on."
             else -> r
         }
     }
@@ -103,6 +106,8 @@ class SimpleModeActivity : AppCompatActivity() {
         status = text("Tap a button.", 24f, "#C5D0DB")
         page.addView(status, spaced())
 
+        page.addView(big("I need help", "#B3261E") { help() }, spaced())
+        page.addView(big("Where am I?", "#1F4E79") { run("Finding where you are") { actions.run("where_am_i", JSONObject()) } }, spaced())
         page.addView(big("Read my messages", "#1F4E79") { run("Reading your messages") { actions.run("read_messages", JSONObject()) } }, spaced())
 
         for (name in SimpleMode.contacts(getSharedPreferences("jarvis", Context.MODE_PRIVATE).getString(SimpleMode.CONTACTS_KEY, SimpleMode.DEFAULT_CONTACTS))) {
@@ -120,6 +125,12 @@ class SimpleModeActivity : AppCompatActivity() {
         askBox.visibility = View.GONE
         if (!yes) { Approvals.cancel(o.id); ActivityLog.add(applicationContext, "Cancelled on the big screen: ${o.title}"); say("Cancelled. Nothing was done."); return }
         run("Doing it") { Approvals.approve(o.id).also { ActivityLog.add(applicationContext, "Approved on the big screen: $it") } }
+    }
+
+    // Texts the emergency contacts with the location, after the same Yes/No as everything else.
+    private fun help() = run("Getting help ready") {
+        val r = actions.run("prepare_sos", JSONObject())
+        if (Approvals.current() != null) ASK else r
     }
 
     private fun call(name: String) = run("Finding $name") {

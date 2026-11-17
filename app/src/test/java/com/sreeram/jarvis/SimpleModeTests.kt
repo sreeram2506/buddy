@@ -43,6 +43,13 @@ class PlainResultTests {
         assertEquals("That was already answered.", SimpleMode.plain(Approvals.NOT_WAITING))
     }
 
+    @Test fun helpProblemsAreExplainedInPlainWords() {
+        assertEquals("No helper has been chosen yet. Please ask someone to add one in Buddy settings.", SimpleMode.plain("No emergency contacts are set. Ask the user who to add."))
+        assertEquals("Buddy is not allowed to send texts. Please ask someone to allow it in Settings.", SimpleMode.plain("SMS permission is not granted."))
+        assertEquals("I cannot find where you are. Please check that location is turned on.", SimpleMode.plain("I can't get your location. Check that location permission and location services are on."))
+        assertEquals("SOS sent to Amma", SimpleMode.plain("SOS sent to Amma"))
+    }
+
     @Test fun anythingElseIsShownAsIs() = assertEquals("Battery is at 80%", SimpleMode.plain("Battery is at 80%"))
 
     @Test fun theSpokenQuestionNamesTheActionAndBothButtons() {
