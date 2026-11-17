@@ -418,6 +418,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     override fun onResume() {
         super.onResume(); visible = true; syncLangSpinner()
+        PaymentGuard.resume(this) // coming back to Buddy means the payment app is done with
         WakeWordService.onWakeInApp = { if (live == null && !listening) beginConversation() }
         // Settings may have changed these while this screen was in the background.
         getSharedPreferences("jarvis", MODE_PRIVATE).let { p ->

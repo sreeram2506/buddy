@@ -21,6 +21,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Spinner
 import android.widget.Switch
+import android.widget.Toast
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
@@ -48,7 +49,27 @@ class BuddySettingsActivity : AppCompatActivity() {
         }
     }
 
-    override fun onResume() { super.onResume(); build() }
+    // Shows the job hunt's progress as it happens, so a run that is waiting on the AI does not look frozen.
+    private var jobStatusView: TextView? = null
+    private val ticker = object : Runnable {
+        override fun run() { jobStatusView?.text = "Last run: " + com.sreeram.jarvis.jobs.JobRunner.status; page.postDelayed(this, 1000) }
+    }
+    override fun onPause() { super.onPause(); page.removeCallbacks(ticker) }
+
+    private val pickResume = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        Thread {
+            val msg = try { "Resume read: ${com.sreeram.jarvis.jobs.ResumeStore.import(this, uri)} characters" } catch (e: Exception) { e.message ?: "Could not read that file" }
+            runOnUiThread { Toast.makeText(this, msg, Toast.LENGTH_LONG).show(); build() }
+        }.start()
+    }
+
+    override fun onResume() {
+        super.onResume(); PaymentGuard.resume(this); build()
+        page.removeCallbacks(ticker); page.post(ticker)
+        // Lets a test run start a preview by intent: adb shell am start -n com.sreeram.jarvis/.BuddySettingsActivity --es job preview
+        intent.getStringExtra("job")?.let { mode -> intent.removeExtra("job"); toast(com.sreeram.jarvis.jobs.JobRunner.start(this, apply = mode == "apply")) }
+    }
 
     private fun build() {
         page.removeAllViews()
@@ -132,6 +153,38 @@ class BuddySettingsActivity : AppCompatActivity() {
             status("Reads notifications and replies", NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName), Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
             status("Is your default assistant", Settings.Secure.getString(contentResolver, "assistant")?.contains(packageName) == true, Settings.ACTION_VOICE_INPUT_SETTINGS)
             button("Allow Buddy to run in the background (battery)") { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+        }
+        section("Payment apps") {
+            toggle("Pause screen control for payment apps", "pause_payments", true, "Google Pay, PhonePe, Paytm, BHIM and most bank apps refuse to open while any screen-control service is on. With this on, Buddy turns its screen control off when one opens, and back on when you say Hey Buddy, lock the phone or open Buddy. The first open of a payment app may still show its warning once; just open it again.")
+            text("Other apps to pause for (package names, comma separated)", "payment_apps", "")
+        }
+        section("Job hunt") {
+            val have = com.sreeram.jarvis.jobs.ResumeStore.hasResume(this)
+            note(if (have) "Resume loaded: ${com.sreeram.jarvis.jobs.ResumeStore.skills(this).size} skills found. It stays on this phone." else "No resume yet. Pick a PDF or text file. It is read on this phone and stays here.")
+            button(if (have) "Replace resume" else "Choose resume (PDF)", "primary") { pickResume.launch(arrayOf("application/pdf", "text/plain")) }
+            if (have) {
+                note("Skills Buddy found: " + com.sreeram.jarvis.jobs.ResumeStore.skills(this).sorted().joinToString(", ").ifEmpty { "none, so matching cannot work" })
+                button("Remove resume") { com.sreeram.jarvis.jobs.ResumeStore.clear(this); build() }
+            }
+            toggle("Use AI to widen my search and judge jobs", "job_ai", true, "Gemini reads your resume to find more roles to search, and reads each job's description to judge the fit. Your resume text and the job text are sent to Google's Gemini for this. Turn it off to keep it all on the phone.")
+            val prof = com.sreeram.jarvis.jobs.JobAI.profile(this)
+            if (have) button(if (prof == null) "Understand my resume with AI" else "Re-read my resume with AI", "primary") {
+                toast("Reading your resume…")
+                Thread { val err = com.sreeram.jarvis.jobs.JobAI.buildProfile(this); runOnUiThread { toast(err ?: "Done"); build() } }.start()
+            }
+            if (prof != null) note("AI sees you as ${prof.seniority}, ${prof.years} years. It will also search: ${prof.searchRoles.joinToString(", ")}")
+            text("Roles to look for (comma separated)", "job_roles", "Full Stack Developer")
+            text("Locations", "job_locations", "Hyderabad")
+            text("Skip jobs containing", "job_exclude", "intern, trainee")
+            number("Lowest salary, lakhs a year (0 = any)", "job_min_lakhs", 0)
+            number("Only jobs posted in the last (days)", "job_max_age", 3)
+            number("Minimum match score (0-100)", "job_min_score", 70)
+            number("Most applications per day", "job_daily_cap", 10)
+            jobStatusView = TextView(this).apply { text = "Last run: " + com.sreeram.jarvis.jobs.JobRunner.status; textSize = 13f; setTextColor(Color.parseColor("#7F8C9A")); setPadding(0, dp(2), 0, dp(8)) }
+            add(jobStatusView!!)
+            button("Preview matches now (applies to nothing)") { toast(com.sreeram.jarvis.jobs.JobRunner.start(this, apply = false)); build() }
+            button("Stop job hunt", "danger") { com.sreeram.jarvis.jobs.JobRunner.stop(); toast("Stopping"); build() }
+            toggle("Let Buddy apply on its own", "job_auto_apply", false, "Off: Buddy only finds and scores jobs. On: when you ask it to apply, it applies to matches within the limits above and logs each one. If Naukri asks questions it cannot answer from your resume, it skips the job.")
         }
         section("Privacy and shutdown") {
             note("Buddy saves no voice recordings. Live talk is streamed to Google's Gemini only while a conversation is open.")

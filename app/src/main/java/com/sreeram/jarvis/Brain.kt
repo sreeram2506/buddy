@@ -126,6 +126,7 @@ class Brain(private val apiKey: String, private val groqKey: String, private val
         Regex("away|silent|vibrate|ring through|pop up|popup|open by itself|decline|ring then|seconds|delay|busy|handle my|i'm back|im back|back now|what did i miss|missed|decline|not available") to
             setOf("start_away", "end_away", "away_summary", "away_status", "set_away_message", "set_my_name", "set_silent_away", "set_ring_through_always", "set_away_popup", "set_away_decline", "set_away_text_delay"),
         Regex("what did you do|what have you done|activity|history of|did you (open|send|call)") to setOf("what_did_you_do"),
+        Regex("job|naukri|resume|hiring|vacanc|apply|applied|application") to setOf("job_hunt"),
         Regex("what did|who said|who sent|told me|said about|find (the|a) message|search my messages|last week|yesterday|earlier|remember when|that address|that number") to setOf("search_memory", "read_messages"),
         Regex("driving|drive|car|ride|on the road") to setOf("driving_mode", "read_messages", "reply_to_caller", "draft_notification_reply", "confirm_send_reply"),
         Regex("interpret|translate for|translator|between .* and") to setOf("start_interpreter", "stop_interpreter"),

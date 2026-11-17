@@ -172,6 +172,7 @@ class PhoneActions(private val context: Context) {
         .put(decl("search_memory", "Search the user's remembered messages (WhatsApp, SMS, chats, email notifications from the last 90 days) for something someone said or sent, e.g. 'what did Dad say about the plumber'. query = the topic words; person and days are optional.", "query" to "string", "person" to "string?", "days" to "integer?"))
         .put(decl("driving_mode", "Turn Driving mode on or off: messages are read aloud and callers you miss get a 'driving' text.", "on" to "boolean"))
         .put(decl("what_did_you_do", "List what Buddy has done on the user's behalf recently (apps opened, messages drafted, calls, etc.).", "count" to "integer?"))
+        .put(decl("job_hunt", "Job hunting on Naukri using the user's saved resume and Job hunt settings. action: preview (find and score jobs, apply to none), apply (also apply to matches, only if the user turned on auto-apply), stop, status (progress and the last result), report (what was found or applied recently).", "action" to "string"))
         .put(decl("away_status", "Say whether Away mode is on and until when."))
         .put(decl("set_away_message", "Change the text Buddy sends to callers and texters in Away mode.", "text" to "string"))
         .put(decl("set_my_name", "Set the name Buddy uses when it replies for the user in Away mode.", "name" to "string"))
@@ -308,6 +309,13 @@ class PhoneActions(private val context: Context) {
             "away_summary" -> Away.summary(context)
             "search_memory" -> MemoryStore.search(context, args.getString("query"), args.optString("person").ifBlank { null }, if (args.has("days")) args.optInt("days") else null)
             "driving_mode" -> if (args.getBoolean("on")) Driving.start(context) else Driving.stop(context)
+            "job_hunt" -> when (args.optString("action", "status")) {
+                "preview" -> com.sreeram.jarvis.jobs.JobRunner.start(context, apply = false)
+                "apply" -> com.sreeram.jarvis.jobs.JobRunner.start(context, apply = true)
+                "stop" -> { com.sreeram.jarvis.jobs.JobRunner.stop(); "Stopping job hunt." }
+                "report" -> com.sreeram.jarvis.jobs.JobLog.recent(context, 10).joinToString("\n").ifBlank { "No jobs looked at yet." }
+                else -> (if (com.sreeram.jarvis.jobs.JobRunner.running) "Running: " else "") + com.sreeram.jarvis.jobs.JobRunner.status
+            }
             "what_did_you_do" -> ActivityLog.recent(context, args.optInt("count", 8).coerceIn(1, 30)).joinToString("\n").ifBlank { "I haven't done anything yet." }
             "away_status" -> (if (Away.active(context)) "Away mode is on" else "Away mode is off") + ". A silent phone counts as away: " + Away.silentSetting(context)
             "set_away_message" -> { context.getSharedPreferences("jarvis", Context.MODE_PRIVATE).edit().putString("away_text", args.getString("text")).apply(); "Away message updated" }

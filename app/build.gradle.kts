@@ -12,7 +12,7 @@ val localProps = Properties().apply {
 
 android {
     // The file you share, e.g. Buddy-debug.apk instead of app-debug.apk.
-    base.archivesName.set("Buddy-1.0.0")
+    base.archivesName.set("Buddy-1.1.0")
     lint {
         // Permissions are requested up front in MainActivity and re-checked in PhoneActions.telecom(); lint cannot see through those helpers.
         disable += "MissingPermission"
@@ -23,8 +23,8 @@ android {
         applicationId = "com.sreeram.jarvis"
         minSdk = 31
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.1.0"
         ndk { abiFilters += "arm64-v8a" }
         buildConfigField("String", "GROQ_KEY", "\"${localProps.getProperty("GROQ_API_KEY", "")}\"")
         buildConfigField("String", "API_KEY", "\"${localProps.getProperty("GEMINI_API_KEY", "")}\"")
@@ -48,4 +48,5 @@ dependencies {
     implementation("com.alphacephei:vosk-android:0.3.47")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.googlecode.libphonenumber:libphonenumber:8.13.50")
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0") // reads the text of a PDF resume
 }

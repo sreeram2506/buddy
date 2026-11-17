@@ -17,7 +17,12 @@ class JarvisAccessibilityService : AccessibilityService() {
     private var nodes: List<AccessibilityNodeInfo> = emptyList()
 
     override fun onServiceConnected() { instance = this }
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val pkg = event.packageName?.toString() ?: return
+        // Payment apps will not run while this service is on, so step aside until the user is done with them.
+        if (PaymentGuard.enabled(this) && PaymentGuard.isPaymentApp(this, pkg)) { PaymentGuard.markPaused(this); disableSelf() }
+    }
     override fun onInterrupt() {}
     override fun onUnbind(intent: android.content.Intent?): Boolean { instance = null; return super.onUnbind(intent) }
 

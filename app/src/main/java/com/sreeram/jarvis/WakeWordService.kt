@@ -53,7 +53,7 @@ class WakeWordService : Service() {
     }
 
     override fun onDestroy() {
-        if (receiversRegistered) { unregisterReceiver(batteryReceiver); unregisterReceiver(ringerReceiver); receiversRegistered = false }
+        if (receiversRegistered) { unregisterReceiver(batteryReceiver); unregisterReceiver(ringerReceiver); unregisterReceiver(screenOffReceiver); receiversRegistered = false }
         running = false
         worker = null
         super.onDestroy()
@@ -78,6 +78,11 @@ class WakeWordService : Service() {
     }
 
     // Opens or closes a silent-mode Away session as soon as the ringer changes, so the summary has the right start time.
+    // Locking the phone ends the payment, so screen control comes back (see PaymentGuard).
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) { PaymentGuard.resume(c) }
+    }
+
     private val ringerReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             Log.d("Jarvis", "ringer changed to ${c.getSystemService(AudioManager::class.java).ringerMode}")
@@ -89,6 +94,7 @@ class WakeWordService : Service() {
         if (!receiversRegistered) {
             ContextCompat.registerReceiver(this, batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED), ContextCompat.RECEIVER_NOT_EXPORTED)
             ContextCompat.registerReceiver(this, ringerReceiver, IntentFilter(AudioManager.RINGER_MODE_CHANGED_ACTION), ContextCompat.RECEIVER_NOT_EXPORTED)
+            ContextCompat.registerReceiver(this, screenOffReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
             receiversRegistered = true
         }
         val nm = getSystemService(NotificationManager::class.java)
@@ -168,6 +174,7 @@ class WakeWordService : Service() {
                     r.close(); r = Recognizer(model, 16000f, WakePhrases.grammar(variants)); r.setWords(true); rec = r
                     Log.d("Jarvis", "wake phrases now: hey buddy + ${variants.joinToString()}")
                 }
+                PaymentGuard.resumeIfStale(this)
                 val awake = isAwake()
                 val stopMode = awake && (Speaker.speaking || activitySpeaking)
                 val wakeMode = awake && !suspended && !Speaker.speaking && System.currentTimeMillis() >= holdUntil
@@ -251,6 +258,7 @@ class WakeWordService : Service() {
                     lastTrigger = System.currentTimeMillis()
                     r.reset()
                     Log.d("Jarvis", "wake word heard: $text")
+                    PaymentGuard.resume(this) // Buddy needs screen control to do anything for the user now
                     acknowledge()
                     holdUntil = System.currentTimeMillis() + 15_000 // the conversation is starting; liveActive takes over from here
                     val inApp = onWakeInApp
