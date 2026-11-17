@@ -26,6 +26,26 @@ object SimpleMode {
     fun contacts(raw: String?): List<String> = (raw ?: "").split(',', '\n').map { it.trim() }.filter { it.isNotEmpty() }.distinct().ifEmpty { listOf(DEFAULT_CONTACTS) }
 
     // find_contact answers "Name: number; Name2: number2" or a sentence such as "No contact matching X". An exact name wins over a partial match.
+    // The tools answer in words meant for the AI ("Tell the user to ..."). On the big screen the person reads them, so they get plain sentences.
+    fun plain(result: String): String {
+        val r = result.trim()
+        Regex("^Sent to (.+?) on [A-Za-z ]+\\. Status: (sent|delivered|read)\\.$").find(r)?.let { return "Sent to ${it.groupValues[1]}." }
+        return when {
+            r.contains("could not find the Send button", true) -> "I could not send it. Please open WhatsApp and tap the green Send button yourself."
+            r.contains("does NOT appear in the chat", true) || r.contains("probably NOT sent", true) -> "It may not have gone through. Please check the chat."
+            r.contains("still pending", true) -> "The message is waiting to be sent. It will go when your phone has internet."
+            r.contains("could not see a delivery tick", true) -> "It looks sent, but I cannot be sure it arrived."
+            r.contains("expired", true) -> "That took too long, so I stopped. Please try again."
+            r.startsWith("No contact matching", true) -> "I could not find that person in your contacts."
+            r.contains("permission", true) && r.contains("contacts", true) -> "Buddy needs permission to see your contacts. Please ask someone to allow it in Settings."
+            r.contains("no longer waiting", true) -> "That was already answered."
+            else -> r
+        }
+    }
+
+    // What Buddy says out loud when it asks for approval, so a person who cannot read the box still knows what they are saying yes to.
+    fun askAloud(title: String) = "Buddy needs your OK. $title. Tap the green button for yes, or the red button for no."
+
     fun pickContact(wanted: String, found: String): Pair<String, String>? {
         val options = found.split(';').mapNotNull { part ->
             val name = part.substringBefore(':').trim(); val number = part.substringAfter(':', "").trim()
@@ -50,7 +70,7 @@ class SimpleModeActivity : AppCompatActivity() {
         override fun run() {
             val o = Approvals.current()
             if (o == null) { askBox.visibility = View.GONE; shownId = -1 }
-            else if (o.id != shownId) { shownId = o.id; askText.text = o.title; askBox.visibility = View.VISIBLE }
+            else if (o.id != shownId) { shownId = o.id; askText.text = o.title; askBox.visibility = View.VISIBLE; Speaker.speak(applicationContext, SimpleMode.askAloud(o.title)) }
             handler.postDelayed(this, 500)
         }
     }
@@ -118,7 +138,7 @@ class SimpleModeActivity : AppCompatActivity() {
     private fun run(doing: String, block: () -> String) {
         status.text = "$doing…"
         Thread {
-            val r = try { block() } catch (e: Exception) { "Something went wrong: ${e.message}" }
+            val r = try { block() } catch (e: Exception) { "Something went wrong: ${e.message}" }.let { if (it == ASK) it else SimpleMode.plain(it) }
             runOnUiThread { if (r == ASK) say("Please tap Yes or No in the yellow box.") else say(r) }
             if (r != ASK) Speaker.speak(applicationContext, r.take(600))
         }.start()
